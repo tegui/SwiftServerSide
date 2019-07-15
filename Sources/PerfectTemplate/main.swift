@@ -3,7 +3,7 @@
 //  PerfectTemplate
 //
 //  Created by Kyle Jessup on 2015-11-05.
-//	Copyright (C) 2015 PerfectlySoft, Inc.
+//    Copyright (C) 2015 PerfectlySoft, Inc.
 //
 //===----------------------------------------------------------------------===//
 //
@@ -16,32 +16,39 @@
 //
 //===----------------------------------------------------------------------===//
 //
-
+import Foundation
 import PerfectHTTP
 import PerfectHTTPServer
+import PerfectSession
+import PerfectSessionSQLite
 
-// An example request handler.
-// This 'handler' function can be referenced directly in the configuration below.
-func handler(request: HTTPRequest, response: HTTPResponse) {
-	// Respond with a simple message.
-	response.setHeader(.contentType, value: "text/html")
-	response.appendBody(string: "<html><title>Hello, world!</title><body>Hello, world!</body></html>")
-	// Ensure that response.completed() is called when your processing is done.
-	response.completed()
+
+struct Main {
+    
+    enum Config {
+        static let hostName     = "localhost"
+        static let portNumber   = 8181
+    }
+    
+    static func run() throws -> () {
+        SessionConfig.name =  "PerfectApi"
+        SessionConfig.idle = 86400
+        SessionConfig.cookieDomain = Config.hostName
+        
+        let sessionDriver = SessionMemoryDriver()
+        
+        let server = HTTPServer()
+        
+        server.setRequestFilters([sessionDriver.requestFilter])
+        server.setResponseFilters([sessionDriver.responseFilter])
+        server.serverPort = 8181
+        server.addRoutes(PerfectRoutes.shared.basicRoutes)
+        
+        server.setResponseFilters([(try PerfectHTTPServer.HTTPFilter.contentCompression(data: [:]), HTTPFilterPriority.high)])
+        
+        try server.start()
+    }
 }
 
-// Configure one server which:
-//	* Serves the hello world message at <host>:<port>/
-//	* Serves static files out of the "./webroot"
-//		directory (which must be located in the current working directory).
-//	* Performs content compression on outgoing data when appropriate.
-var routes = Routes()
-routes.add(method: .get, uri: "/", handler: handler)
-routes.add(method: .get, uri: "/**",
-		   handler: StaticFileHandler(documentRoot: "./webroot", allowResponseFilters: true).handleRequest)
-try HTTPServer.launch(name: "localhost",
-					  port: 8181,
-					  routes: routes,
-					  responseFilters: [
-						(PerfectHTTPServer.HTTPFilter.contentCompression(data: [:]), HTTPFilterPriority.high)])
+try Main.run()
 
